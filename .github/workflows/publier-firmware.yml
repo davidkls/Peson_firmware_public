@@ -1,0 +1,71 @@
+name: Publier firmware stable
+on:
+  push:
+    paths:
+      - 'releases/v*/*.zip'
+      - '.github/workflows/publier-firmware.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer les paquets publics
+        uses: actions/checkout@v4
+
+      - name: Vérifier et publier les versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for archive in releases/v*/*.zip; do
+            version="$(basename "$(dirname "$archive")")"
+            if [[ ! "$version" =~ ^v[0-9]+(\.[0-9]+){0,2}$ ]]; then
+              echo "::error::Tag invalide : $version"
+              exit 1
+            fi
+            out="$(mktemp -d)"
+            python3 - "$archive" "$out" <<'PY'
+          import hashlib, os, re, sys, zipfile
+
+          archive, dest = sys.argv[1:]
+          expected_names = {
+              "PrintForFishing_ESP32C3_ota.bin",
+              "PrintForFishing_ESP32C3_ota.sha256",
+          }
+          with zipfile.ZipFile(archive) as z:
+              if set(z.namelist()) != expected_names:
+                  raise ValueError("Archive : uniquement firmware ESP32-C3 + SHA-256 attendus")
+              image = z.read("PrintForFishing_ESP32C3_ota.bin")
+              manifest = z.read("PrintForFishing_ESP32C3_ota.sha256").decode("ascii").strip()
+              if not (32000 <= len(image) <= 2800000):
+                  raise ValueError("Taille du firmware invalide")
+              if len(image) < 24 or image[0] != 0xe9 or int.from_bytes(image[12:14], "little") != 5:
+                  raise ValueError("Ce binaire n'est pas pour ESP32-C3")
+              if not re.fullmatch(r"[a-fA-F0-9]{64}\s+\*?PrintForFishing_ESP32C3_ota\.bin", manifest):
+                  raise ValueError("Fichier SHA-256 invalide")
+              if hashlib.sha256(image).hexdigest().lower() != manifest[:64].lower():
+                  raise ValueError("Somme SHA-256 incorrecte")
+              for filename in sorted(expected_names):
+                  with open(os.path.join(dest, filename), "wb") as f:
+                      f.write(z.read(filename))
+          print(f"Paquet vérifié : {archive} — {len(image)} octets")
+          PY
+            if gh release view "$version" >/dev/null 2>&1; then
+              echo "La version $version est déjà publiée : conservation du binaire initial"
+              continue
+            fi
+            gh release create "$version" \
+              "$out/PrintForFishing_ESP32C3_ota.bin" \
+              "$out/PrintForFishing_ESP32C3_ota.sha256" \
+              --title "Peson PrintForFishing $version" \
+              --notes "Firmware ESP32-C3 PrintForFishing. Installation via l'application mobile (V22 requise au préalable). Garder le peson alimenté pendant l'installation." \
+              --latest
+            rm -rf "$out"
+          done
