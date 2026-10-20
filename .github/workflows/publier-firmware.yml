@@ -40,8 +40,15 @@ jobs:
               "PrintForFishing_ESP32C3_ota.sha256",
           }
           with zipfile.ZipFile(archive) as z:
-              if set(z.namelist()) != expected_names:
-                  raise ValueError("Archive : uniquement firmware ESP32-C3 + SHA-256 attendus")
+              names=set(z.namelist())
+              version_file="PrintForFishing_version.txt"
+              if not expected_names.issubset(names) or names-expected_names-{version_file}:
+                  raise ValueError("Archive : fichiers ESP32-C3, SHA-256 et version uniquement")
+              if version_file in names:
+                  embedded_version=z.read(version_file).decode("ascii").strip()
+                  published_version=os.path.basename(os.path.dirname(archive)).lstrip("v")
+                  if embedded_version != published_version:
+                      raise ValueError("Numéro de version du firmware incohérent")
               image = z.read("PrintForFishing_ESP32C3_ota.bin")
               manifest = z.read("PrintForFishing_ESP32C3_ota.sha256").decode("ascii").strip()
               if not (32000 <= len(image) <= 2800000):
