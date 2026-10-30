@@ -1,0 +1,44 @@
+name: Publier GRAVIS v1.0.9
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-v109-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publier firmware v1.0.9 verifie
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_URL: 'https://sdmntprnortheu.oaiusercontent.com/files/00000000-63f8-81f4-acf9-e2eca0633ca4/raw?se=2026-10-30T20%3A12%3A10Z&sp=r&sv=2026-02-06&sr=b&scid=a59a5c4f-fa88-5ad4-93b5-e1942e4b3382&skoid=d4d17077-8f33-42a9-bd8b-aa9d5eaf5320&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-30T03%3A26%3A37Z&ske=2026-10-31T03%3A26%3A37Z&sks=b&skv=2026-02-06&sig=QL3esNaOE0i1Hxjd5sa8sy2tVxGjr2jgGgf3S%2BZknGo%3D'
+        run: |
+          set -euo pipefail
+          if gh release view v1.0.9 >/dev/null 2>&1; then
+            echo "v1.0.9 deja publiee"
+            exit 0
+          fi
+          curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 "$SOURCE_URL" -o /tmp/gravis-source.zip
+          unzip -p /tmp/gravis-source.zip PrintForFishing_ESP32C3_ota.bin > PrintForFishing_ESP32C3_ota.bin
+          unzip -p /tmp/gravis-source.zip PrintForFishing_ESP32C3_ota.sha256 > PrintForFishing_ESP32C3_ota.sha256
+          sha256sum -c PrintForFishing_ESP32C3_ota.sha256
+          python3 - <<'PY'
+          import os
+          f='PrintForFishing_ESP32C3_ota.bin'
+          b=open(f,'rb').read(24)
+          assert len(b)==24 and b[0]==0xe9 and int.from_bytes(b[12:14],'little')==5, 'Wrong MCU target'
+          assert 32000<=os.path.getsize(f)<=2800000
+          print('Firmware ESP32-C3 authentifie et valide')
+          PY
+          gh release create v1.0.9 \
+            PrintForFishing_ESP32C3_ota.bin \
+            PrintForFishing_ESP32C3_ota.sha256 \
+            --title 'GRAVIS firmware v1.0.9' \
+            --notes 'Poids a trois decimales et pas de 25 g. Corrections BLE enregistrement instantane, double clic SAVE, tare stable +/- 100 g pendant 1,5 s.' \
+            --latest
