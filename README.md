@@ -2,6 +2,12 @@
 
 Ce dépôt **public** ne distribue **que les binaires** de mise à jour du peson ESP32-C3 PrintForFishing. Le code source du firmware reste dans le dépôt privé `davidkls/Peson_firmware`.
 
+## Firmware v1.0.10 : association Bluetooth securisee
+
+**Installer d'abord l'application GRAVIS Android 1.0.27 ou superieure avant de mettre le peson a jour vers v1.0.10.** La version du firmware active les associations securisees et les anciennes versions Android n'ont pas la procedure d'association correspondante. Au premier appairage ou pour ajouter un telephone, maintenir TARE + SAVE pendant 3 secondes, puis saisir le code affiche sur l'ecran via le dialogue Android. Pour effacer les associations Bluetooth en cas de revente, maintenir TARE + SAVE pendant 8 secondes.
+
+Le retour vers v1.0.9 est possible par mise a jour manuelle si la liaison BLE fonctionne, ou par USB si elle ne fonctionne plus. Le controle physique du peson n'a pas ete valide au moment de la publication du binaire.
+
 Les mises à jour sont publiées dans [**Releases**](https://github.com/davidkls/Peson_firmware_public/releases/latest). L'application PrintForFishing vérifie cette page au démarrage et propose l'installation lorsqu'une version plus récente du firmware est disponible.
 
 Chaque version stable contient :
